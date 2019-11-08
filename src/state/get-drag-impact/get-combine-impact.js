@@ -56,7 +56,7 @@ const isCombiningWith = ({
   const start: number = borderBox[axis.start] + displaceBy[axis.line];
   const end: number = borderBox[axis.end] + displaceBy[axis.line];
   const size: number = borderBox[axis.size];
-  const twoThirdsOfSize: number = size * 0.666;
+  const twoThirdsOfSize: number = size * 1;
 
   const whenEntered: UserDirection = getWhenEntered(
     id,
