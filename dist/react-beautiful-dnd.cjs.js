@@ -6,20 +6,15 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 
 var React = require('react');
 var React__default = _interopDefault(React);
-var useMemoOne = require('use-memo-one');
-var _inheritsLoose = _interopDefault(require('@babel/runtime-corejs2/helpers/inheritsLoose'));
-var _extends = _interopDefault(require('@babel/runtime-corejs2/helpers/extends'));
+var _inheritsLoose = _interopDefault(require('@babel/runtime/helpers/inheritsLoose'));
+var _extends = _interopDefault(require('@babel/runtime/helpers/extends'));
 var redux = require('redux');
 var reactRedux = require('react-redux');
+var useMemoOne = require('use-memo-one');
 var cssBoxModel = require('css-box-model');
 var memoizeOne = _interopDefault(require('memoize-one'));
-var _Object$values = _interopDefault(require('@babel/runtime-corejs2/core-js/object/values'));
-var _Object$keys = _interopDefault(require('@babel/runtime-corejs2/core-js/object/keys'));
 var rafSchd = _interopDefault(require('raf-schd'));
-var _Date$now = _interopDefault(require('@babel/runtime-corejs2/core-js/date/now'));
-var _Object$assign = _interopDefault(require('@babel/runtime-corejs2/core-js/object/assign'));
 var ReactDOM = _interopDefault(require('react-dom'));
-var _Number$isInteger = _interopDefault(require('@babel/runtime-corejs2/core-js/number/is-integer'));
 
 var isProduction = process.env.NODE_ENV === 'production';
 var spacesAndTabs = /[ \t]{2,}/g;
@@ -177,14 +172,14 @@ var ErrorBoundary = function (_React$Component) {
   return ErrorBoundary;
 }(React__default.Component);
 
-var liftInstruction = "Draggable item. Ensure your screen reader is not in browse mode and then press space bar to lift.";
+var dragHandleUsageInstructions = "\n  Press space bar to start a drag.\n  When dragging you can use the arrow keys to move the item around and escape to cancel.\n  Some screen readers may require you to be in focus mode or to use your pass through key\n";
 
 var position = function position(index) {
   return index + 1;
 };
 
 var onDragStart = function onDragStart(start) {
-  return "\n  You have lifted an item in position " + position(start.source.index) + ".\n  Use the arrow keys to move, space bar to drop, and escape to cancel.\n";
+  return "\n  You have lifted an item in position " + position(start.source.index) + "\n";
 };
 
 var withLocation = function withLocation(source, destination) {
@@ -249,7 +244,7 @@ var onDragEnd = function onDragEnd(result) {
 };
 
 var preset = {
-  liftInstruction: liftInstruction,
+  dragHandleUsageInstructions: dragHandleUsageInstructions,
   onDragStart: onDragStart,
   onDragUpdate: onDragUpdate,
   onDragEnd: onDragEnd
@@ -425,8 +420,21 @@ var scrollDroppable = (function (droppable, newScroll) {
   return result;
 });
 
+function isInteger(value) {
+  if (Number.isInteger) {
+    return Number.isInteger(value);
+  }
+
+  return typeof value === 'number' && isFinite(value) && Math.floor(value) === value;
+}
 function values(map) {
-  return _Object$values(map);
+  if (Object.values) {
+    return Object.values(map);
+  }
+
+  return Object.keys(map).map(function (key) {
+    return map[key];
+  });
 }
 function findIndex(list, predicate) {
   if (list.findIndex) {
@@ -486,15 +494,6 @@ var getDraggablesInsideDroppable = memoizeOne(function (droppableId, draggables)
   return result;
 });
 
-var forward = {
-  vertical: 'down',
-  horizontal: 'right'
-};
-var backward = {
-  vertical: 'up',
-  horizontal: 'left'
-};
-
 function tryGetDestination(impact) {
   if (impact.at && impact.at.type === 'REORDER') {
     return impact.at.destination;
@@ -536,7 +535,6 @@ var moveToNextCombine = (function (_ref) {
   function getImpact(target) {
     var at = {
       type: 'COMBINE',
-      whenEntered: isMovingForward ? forward : backward,
       combine: {
         draggableId: target,
         droppableId: destination.descriptor.id
@@ -1821,46 +1819,112 @@ function isMovementAllowed(state) {
   return state.phase === 'DRAGGING' || state.phase === 'COLLECTING';
 }
 
-var isPositionInFrame = (function (frame) {
+function isPositionInFrame(frame) {
   var isWithinVertical = isWithin(frame.top, frame.bottom);
   var isWithinHorizontal = isWithin(frame.left, frame.right);
-  return function (point) {
-    return isWithinVertical(point.y) && isWithinVertical(point.y) && isWithinHorizontal(point.x) && isWithinHorizontal(point.x);
+  return function run(point) {
+    return isWithinVertical(point.y) && isWithinHorizontal(point.x);
   };
-});
+}
 
-var getDroppableOver$1 = (function (_ref) {
-  var target = _ref.target,
-      droppables = _ref.droppables;
-  var maybe = find(toDroppableList(droppables), function (droppable) {
-    if (!droppable.isEnabled) {
+function getHasOverlap(first, second) {
+  return first.left < second.right && first.right > second.left && first.top < second.bottom && first.bottom > second.top;
+}
+
+function getFurthestAway(_ref) {
+  var pageBorderBox = _ref.pageBorderBox,
+      draggable = _ref.draggable,
+      candidates = _ref.candidates;
+  var startCenter = draggable.page.borderBox.center;
+  var sorted = candidates.map(function (candidate) {
+    var axis = candidate.axis;
+    var target = patch(candidate.axis.line, pageBorderBox.center[axis.line], candidate.page.borderBox.center[axis.crossAxisLine]);
+    return {
+      id: candidate.descriptor.id,
+      distance: distance(startCenter, target)
+    };
+  }).sort(function (a, b) {
+    return b.distance - a.distance;
+  });
+  return sorted[0] ? sorted[0].id : null;
+}
+
+function getDroppableOver$1(_ref2) {
+  var pageBorderBox = _ref2.pageBorderBox,
+      draggable = _ref2.draggable,
+      droppables = _ref2.droppables;
+  var candidates = toDroppableList(droppables).filter(function (item) {
+    if (!item.isEnabled) {
       return false;
     }
 
-    var active = droppable.subject.active;
+    var active = item.subject.active;
 
     if (!active) {
       return false;
     }
 
-    return isPositionInFrame(active)(target);
-  });
-  return maybe ? maybe.descriptor.id : null;
-});
+    if (!getHasOverlap(pageBorderBox, active)) {
+      return false;
+    }
 
-var withDroppableScroll = (function (droppable, point) {
+    if (isPositionInFrame(active)(pageBorderBox.center)) {
+      return true;
+    }
+
+    var axis = item.axis;
+    var childCenter = active.center[axis.crossAxisLine];
+    var crossAxisStart = pageBorderBox[axis.crossAxisStart];
+    var crossAxisEnd = pageBorderBox[axis.crossAxisEnd];
+    var isContained = isWithin(active[axis.crossAxisStart], active[axis.crossAxisEnd]);
+    var isStartContained = isContained(crossAxisStart);
+    var isEndContained = isContained(crossAxisEnd);
+
+    if (!isStartContained && !isEndContained) {
+      return true;
+    }
+
+    if (isStartContained) {
+      return crossAxisStart < childCenter;
+    }
+
+    return crossAxisEnd > childCenter;
+  });
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  if (candidates.length === 1) {
+    return candidates[0].descriptor.id;
+  }
+
+  return getFurthestAway({
+    pageBorderBox: pageBorderBox,
+    draggable: draggable,
+    candidates: candidates
+  });
+}
+
+var offsetRectByPosition = function offsetRectByPosition(rect, point) {
+  return cssBoxModel.getRect(offsetByPosition(rect, point));
+};
+
+var withDroppableScroll = (function (droppable, area) {
   var frame = droppable.frame;
 
   if (!frame) {
-    return point;
+    return area;
   }
 
-  return add(point, frame.scroll.diff.value);
+  return offsetRectByPosition(area, frame.scroll.diff.value);
 });
 
-var isUserMovingForward = (function (axis, direction) {
-  return axis === vertical ? direction.vertical === 'down' : direction.horizontal === 'right';
-});
+function getIsDisplaced(_ref) {
+  var displaced = _ref.displaced,
+      id = _ref.id;
+  return Boolean(displaced.visible[id] || displaced.invisible[id]);
+}
 
 function atIndex(_ref) {
   var draggable = _ref.draggable,
@@ -1883,40 +1947,41 @@ function atIndex(_ref) {
 }
 
 var getReorderImpact = (function (_ref2) {
-  var currentCenter = _ref2.pageBorderBoxCenterWithDroppableScrollChange,
+  var targetRect = _ref2.pageBorderBoxWithDroppableScroll,
       draggable = _ref2.draggable,
       destination = _ref2.destination,
       insideDestination = _ref2.insideDestination,
       last = _ref2.last,
       viewport = _ref2.viewport,
-      userDirection = _ref2.userDirection,
       afterCritical = _ref2.afterCritical;
   var axis = destination.axis;
-  var isMovingForward = isUserMovingForward(destination.axis, userDirection);
   var displacedBy = getDisplacedBy(destination.axis, draggable.displaceBy);
-  var targetCenter = currentCenter[axis.line];
   var displacement = displacedBy.value;
+  var targetStart = targetRect[axis.start];
+  var targetEnd = targetRect[axis.end];
   var withoutDragging = removeDraggableFromList(draggable, insideDestination);
   var closest = find(withoutDragging, function (child) {
     var id = child.descriptor.id;
-    var borderBox = child.page.borderBox;
-    var start = borderBox[axis.start];
-    var end = borderBox[axis.end];
+    var childCenter = child.page.borderBox.center[axis.line];
     var didStartAfterCritical$1 = didStartAfterCritical(id, afterCritical);
-
-    if (isMovingForward) {
-      if (didStartAfterCritical$1) {
-        return targetCenter < start;
-      }
-
-      return targetCenter < start + displacement;
-    }
+    var isDisplaced = getIsDisplaced({
+      displaced: last,
+      id: id
+    });
 
     if (didStartAfterCritical$1) {
-      return targetCenter <= end - displacement;
+      if (isDisplaced) {
+        return targetEnd <= childCenter;
+      }
+
+      return targetStart < childCenter - displacement;
     }
 
-    return targetCenter <= end;
+    if (isDisplaced) {
+      return targetEnd <= childCenter + displacement;
+    }
+
+    return targetStart < childCenter;
   });
   var newIndex = atIndex({
     draggable: draggable,
@@ -1934,150 +1999,81 @@ var getReorderImpact = (function (_ref2) {
   });
 });
 
-function getWhenEntered(id, current, lastCombineImpact) {
-  if (!lastCombineImpact) {
-    return current;
-  }
-
-  if (id !== lastCombineImpact.combine.draggableId) {
-    return current;
-  }
-
-  return lastCombineImpact.whenEntered;
-}
-
-function tryGetCombineImpact(impact) {
-  if (impact.at && impact.at.type === 'COMBINE') {
-    return impact.at;
-  }
-
-  return null;
-}
-
-function calculateCombineImpact(_ref) {
-  var combineWithId = _ref.combineWithId,
-      destinationId = _ref.destinationId,
-      userDirection = _ref.userDirection,
-      previousImpact = _ref.previousImpact;
-  var lastCombineImpact = tryGetCombineImpact(previousImpact);
-  var whenEntered = getWhenEntered(combineWithId, userDirection, lastCombineImpact);
-  var impact = {
-    displacedBy: previousImpact.displacedBy,
-    displaced: previousImpact.displaced,
-    at: {
-      type: 'COMBINE',
-      whenEntered: whenEntered,
-      combine: {
-        draggableId: combineWithId,
-        droppableId: destinationId
-      }
-    }
-  };
-  return impact;
-}
-
-function getWhenEntered$1(id, current, lastCombineImpact) {
-  if (!lastCombineImpact) {
-    return current;
-  }
-
-  if (id !== lastCombineImpact.combine.draggableId) {
-    return current;
-  }
-
-  return lastCombineImpact.whenEntered;
-}
-
-var isCombiningWith = function isCombiningWith(_ref) {
-  var id = _ref.id,
-      currentCenter = _ref.currentCenter,
-      axis = _ref.axis,
-      borderBox = _ref.borderBox,
-      displaceBy = _ref.displaceBy,
-      currentUserDirection = _ref.currentUserDirection,
-      lastCombineImpact = _ref.lastCombineImpact;
-  var start = borderBox[axis.start] + displaceBy[axis.line];
-  var end = borderBox[axis.end] + displaceBy[axis.line];
-  var size = borderBox[axis.size];
-  var twoThirdsOfSize = size * 1;
-  var whenEntered = getWhenEntered$1(id, currentUserDirection, lastCombineImpact);
-  var isMovingForward = isUserMovingForward(axis, whenEntered);
-  var targetCenter = currentCenter[axis.line];
-
-  if (isMovingForward) {
-    return isWithin(start, start + twoThirdsOfSize)(targetCenter);
-  }
-
-  return isWithin(end - twoThirdsOfSize, end)(targetCenter);
-};
-
-function tryGetCombineImpact$1(impact) {
-  if (impact.at && impact.at.type === 'COMBINE') {
-    return impact.at;
-  }
-
-  return null;
-}
-
-var getCombineImpact = (function (_ref2) {
-  var draggable = _ref2.draggable,
-      currentCenter = _ref2.pageBorderBoxCenterWithDroppableScrollChange,
-      previousImpact = _ref2.previousImpact,
-      destination = _ref2.destination,
-      insideDestination = _ref2.insideDestination,
-      userDirection = _ref2.userDirection,
-      afterCritical = _ref2.afterCritical;
+var combineThresholdDivisor = 1;
+var getCombineImpact = (function (_ref) {
+  var draggable = _ref.draggable,
+      targetRect = _ref.pageBorderBoxWithDroppableScroll,
+      previousImpact = _ref.previousImpact,
+      destination = _ref.destination,
+      insideDestination = _ref.insideDestination,
+      afterCritical = _ref.afterCritical;
 
   if (!destination.isCombineEnabled) {
     return null;
   }
 
   var axis = destination.axis;
-  var displaced = previousImpact.displaced;
-  var canBeDisplacedBy = getDisplacedBy(destination.axis, draggable.displaceBy);
-  var lastCombineImpact = tryGetCombineImpact$1(previousImpact);
-  var combineWith = find(removeDraggableFromList(draggable, insideDestination), function (child) {
+  var displacedBy = getDisplacedBy(destination.axis, draggable.displaceBy);
+  var displacement = displacedBy.value;
+  var targetStart = targetRect[axis.start];
+  var targetEnd = targetRect[axis.end];
+  var withoutDragging = removeDraggableFromList(draggable, insideDestination);
+  var combineWith = find(withoutDragging, function (child) {
     var id = child.descriptor.id;
-    var displaceBy = getCombinedItemDisplacement({
-      displaced: displaced,
-      afterCritical: afterCritical,
-      combineWith: id,
-      displacedBy: canBeDisplacedBy
+    var childRect = child.page.borderBox;
+    var childSize = childRect[axis.size];
+    var threshold = childSize / combineThresholdDivisor;
+    var didStartAfterCritical$1 = didStartAfterCritical(id, afterCritical);
+    var isDisplaced = getIsDisplaced({
+      displaced: previousImpact.displaced,
+      id: id
     });
-    return isCombiningWith({
-      id: id,
-      currentCenter: currentCenter,
-      axis: axis,
-      borderBox: child.page.borderBox,
-      displaceBy: displaceBy,
-      currentUserDirection: userDirection,
-      lastCombineImpact: lastCombineImpact
-    });
+
+    if (didStartAfterCritical$1) {
+      if (isDisplaced) {
+        return targetEnd > childRect[axis.start] + threshold && targetEnd < childRect[axis.end] - threshold;
+      }
+
+      return targetStart > childRect[axis.start] - displacement + threshold && targetStart < childRect[axis.end] - displacement - threshold;
+    }
+
+    if (isDisplaced) {
+      return targetEnd > childRect[axis.start] + displacement + threshold && targetEnd < childRect[axis.end] + displacement - threshold;
+    }
+
+    return targetStart > childRect[axis.start] + threshold && targetStart < childRect[axis.end] - threshold;
   });
 
   if (!combineWith) {
     return null;
   }
 
-  return calculateCombineImpact({
-    combineWithId: combineWith.descriptor.id,
-    destinationId: destination.descriptor.id,
-    previousImpact: previousImpact,
-    userDirection: userDirection
-  });
+  var impact = {
+    displacedBy: displacedBy,
+    displaced: previousImpact.displaced,
+    at: {
+      type: 'COMBINE',
+      combine: {
+        draggableId: combineWith.descriptor.id,
+        droppableId: destination.descriptor.id
+      }
+    }
+  };
+  return impact;
 });
 
 var getDragImpact = (function (_ref) {
-  var pageBorderBoxCenter = _ref.pageBorderBoxCenter,
+  var pageOffset = _ref.pageOffset,
       draggable = _ref.draggable,
       draggables = _ref.draggables,
       droppables = _ref.droppables,
       previousImpact = _ref.previousImpact,
       viewport = _ref.viewport,
-      userDirection = _ref.userDirection,
       afterCritical = _ref.afterCritical;
+  var pageBorderBox = offsetRectByPosition(draggable.page.borderBox, pageOffset);
   var destinationId = getDroppableOver$1({
-    target: pageBorderBoxCenter,
+    pageBorderBox: pageBorderBox,
+    draggable: draggable,
     droppables: droppables
   });
 
@@ -2087,49 +2083,23 @@ var getDragImpact = (function (_ref) {
 
   var destination = droppables[destinationId];
   var insideDestination = getDraggablesInsideDroppable(destination.descriptor.id, draggables);
-  var pageBorderBoxCenterWithDroppableScrollChange = withDroppableScroll(destination, pageBorderBoxCenter);
+  var pageBorderBoxWithDroppableScroll = withDroppableScroll(destination, pageBorderBox);
   return getCombineImpact({
-    pageBorderBoxCenterWithDroppableScrollChange: pageBorderBoxCenterWithDroppableScrollChange,
+    pageBorderBoxWithDroppableScroll: pageBorderBoxWithDroppableScroll,
     draggable: draggable,
     previousImpact: previousImpact,
     destination: destination,
     insideDestination: insideDestination,
-    userDirection: userDirection,
     afterCritical: afterCritical
   }) || getReorderImpact({
-    pageBorderBoxCenterWithDroppableScrollChange: pageBorderBoxCenterWithDroppableScrollChange,
+    pageBorderBoxWithDroppableScroll: pageBorderBoxWithDroppableScroll,
     draggable: draggable,
     destination: destination,
     insideDestination: insideDestination,
     last: previousImpact.displaced,
     viewport: viewport,
-    userDirection: userDirection,
     afterCritical: afterCritical
   });
-});
-
-var getVertical = function getVertical(previous, diff) {
-  if (diff === 0) {
-    return previous;
-  }
-
-  return diff > 0 ? 'down' : 'up';
-};
-
-var getHorizontal = function getHorizontal(previous, diff) {
-  if (diff === 0) {
-    return previous;
-  }
-
-  return diff > 0 ? 'right' : 'left';
-};
-
-var getUserDirection = (function (previous, oldPageBorderBoxCenter, newPageBorderBoxCenter) {
-  var diff = subtract(newPageBorderBoxCenter, oldPageBorderBoxCenter);
-  return {
-    horizontal: getHorizontal(previous.horizontal, diff.x),
-    vertical: getVertical(previous.vertical, diff.y)
-  };
 });
 
 var patchDroppableMap = (function (droppables, updated) {
@@ -2202,7 +2172,6 @@ var update = (function (_ref) {
       forcedImpact = _ref.impact,
       scrollJumpRequest = _ref.scrollJumpRequest;
   var viewport = forcedViewport || state.viewport;
-  var currentWindowScroll = viewport.scroll.current;
   var dimensions = forcedDimensions || state.dimensions;
   var clientSelection = forcedClientSelection || state.current.client.selection;
   var offset = subtract(clientSelection, state.initial.client.selection);
@@ -2212,14 +2181,14 @@ var update = (function (_ref) {
     borderBoxCenter: add(state.initial.client.borderBoxCenter, offset)
   };
   var page = {
-    selection: add(client.selection, currentWindowScroll),
-    borderBoxCenter: add(client.borderBoxCenter, currentWindowScroll)
+    selection: add(client.selection, viewport.scroll.current),
+    borderBoxCenter: add(client.borderBoxCenter, viewport.scroll.current),
+    offset: add(client.offset, viewport.scroll.diff.value)
   };
   var current = {
     client: client,
     page: page
   };
-  var userDirection = getUserDirection(state.userDirection, state.current.page.borderBoxCenter, current.page.borderBoxCenter);
 
   if (state.phase === 'COLLECTING') {
     return _extends({
@@ -2227,20 +2196,18 @@ var update = (function (_ref) {
     }, state, {
       dimensions: dimensions,
       viewport: viewport,
-      current: current,
-      userDirection: userDirection
+      current: current
     });
   }
 
   var draggable = dimensions.draggables[state.critical.draggable.id];
   var newImpact = forcedImpact || getDragImpact({
-    pageBorderBoxCenter: page.borderBoxCenter,
+    pageOffset: page.offset,
     draggable: draggable,
     draggables: dimensions.draggables,
     droppables: dimensions.droppables,
     previousImpact: state.impact,
     viewport: viewport,
-    userDirection: userDirection,
     afterCritical: state.afterCritical
   });
   var withUpdatedPlaceholders = recomputePlaceholders({
@@ -2253,7 +2220,6 @@ var update = (function (_ref) {
 
   var result = _extends({}, state, {
     current: current,
-    userDirection: userDirection,
     dimensions: {
       draggables: dimensions.draggables,
       droppables: withUpdatedPlaceholders
@@ -2407,61 +2373,18 @@ var patchDimensionMap = (function (dimensions, updated) {
   };
 });
 
-var records = {};
-var isEnabled = false;
-
-var isTimingsEnabled = function isTimingsEnabled() {
-  return isEnabled;
-};
 var start = function start(key) {
   if (process.env.NODE_ENV !== 'production') {
-    if (!isTimingsEnabled()) {
+    {
       return;
     }
-
-    var now = performance.now();
-    records[key] = now;
   }
 };
 var finish = function finish(key) {
   if (process.env.NODE_ENV !== 'production') {
-    if (!isTimingsEnabled()) {
+    {
       return;
     }
-
-    var now = performance.now();
-    var previous = records[key];
-
-    if (!previous) {
-      console.warn('cannot finish timing as no previous time found', key);
-      return;
-    }
-
-    var result = now - previous;
-    var rounded = result.toFixed(2);
-
-    var style = function () {
-      if (result < 12) {
-        return {
-          textColor: 'green',
-          symbol: '✅'
-        };
-      }
-
-      if (result < 40) {
-        return {
-          textColor: 'orange',
-          symbol: '⚠️'
-        };
-      }
-
-      return {
-        textColor: 'red',
-        symbol: '❌'
-      };
-    }();
-
-    console.log(style.symbol + " %cTiming %c" + rounded + " %cms %c" + key, 'color: blue; font-weight: bold;', "color: " + style.textColor + "; font-size: 1.1em;", 'color: grey;', 'color: purple; font-weight: bold;');
   }
 };
 
@@ -2509,13 +2432,10 @@ var adjustAdditionsForScrollChanges = (function (_ref) {
   });
 });
 
-var timingsKey = 'Processing dynamic changes';
 var publishWhileDraggingInVirtual = (function (_ref) {
-  var _extends2, _extends3;
-
   var state = _ref.state,
       published = _ref.published;
-  start(timingsKey);
+  start();
   var withScrollChange = published.modified.map(function (update) {
     var existing = state.dimensions.droppables[update.droppableId];
     var scrolled = scrollDroppable(existing, update.scroll);
@@ -2555,20 +2475,26 @@ var publishWhileDraggingInVirtual = (function (_ref) {
 
   var previousImpact = wasOver && wasOver.isCombineEnabled ? state.impact : onLiftImpact;
   var impact = getDragImpact({
-    pageBorderBoxCenter: state.current.page.borderBoxCenter,
+    pageOffset: state.current.page.offset,
     draggable: dimensions.draggables[state.critical.draggable.id],
     draggables: dimensions.draggables,
     droppables: dimensions.droppables,
     previousImpact: previousImpact,
     viewport: state.viewport,
-    userDirection: state.userDirection,
     afterCritical: afterCritical
   });
-  finish(timingsKey);
+  finish();
 
   var draggingState = _extends({
     phase: 'DRAGGING'
-  }, state, (_extends2 = {}, _extends2["phase"] = 'DRAGGING', _extends2.impact = impact, _extends2.onLiftImpact = onLiftImpact, _extends2.dimensions = dimensions, _extends2.afterCritical = afterCritical, _extends2.forceShouldAnimate = false, _extends2));
+  }, state, {
+    phase: 'DRAGGING',
+    impact: impact,
+    onLiftImpact: onLiftImpact,
+    dimensions: dimensions,
+    afterCritical: afterCritical,
+    forceShouldAnimate: false
+  });
 
   if (state.phase === 'COLLECTING') {
     return draggingState;
@@ -2576,7 +2502,11 @@ var publishWhileDraggingInVirtual = (function (_ref) {
 
   var dropPending = _extends({
     phase: 'DROP_PENDING'
-  }, draggingState, (_extends3 = {}, _extends3["phase"] = 'DROP_PENDING', _extends3.reason = state.reason, _extends3.isWaiting = false, _extends3));
+  }, draggingState, {
+    phase: 'DROP_PENDING',
+    reason: state.reason,
+    isWaiting: false
+  });
 
   return dropPending;
 });
@@ -2648,7 +2578,8 @@ var reducer = (function (state, action) {
       client: client,
       page: {
         selection: add(client.selection, viewport.scroll.initial),
-        borderBoxCenter: add(client.selection, viewport.scroll.initial)
+        borderBoxCenter: add(client.selection, viewport.scroll.initial),
+        offset: add(client.selection, viewport.scroll.diff.value)
       }
     };
     var isWindowScrollAllowed = toDroppableList(dimensions.droppables).every(function (item) {
@@ -2677,7 +2608,6 @@ var reducer = (function (state, action) {
       afterCritical: afterCritical,
       onLiftImpact: impact,
       viewport: viewport,
-      userDirection: forward,
       scrollJumpRequest: null,
       forceShouldAnimate: null
     };
@@ -2685,8 +2615,6 @@ var reducer = (function (state, action) {
   }
 
   if (action.type === 'COLLECTION_STARTING') {
-    var _extends2;
-
     if (state.phase === 'COLLECTING' || state.phase === 'DROP_PENDING') {
       return state;
     }
@@ -2695,7 +2623,9 @@ var reducer = (function (state, action) {
 
     var _result = _extends({
       phase: 'COLLECTING'
-    }, state, (_extends2 = {}, _extends2["phase"] = 'COLLECTING', _extends2));
+    }, state, {
+      phase: 'COLLECTING'
+    });
 
     return _result;
   }
@@ -2867,14 +2797,16 @@ var reducer = (function (state, action) {
   }
 
   if (action.type === 'DROP_PENDING') {
-    var _extends3;
-
     var reason = action.payload.reason;
     !(state.phase === 'COLLECTING') ? process.env.NODE_ENV !== "production" ? invariant(false, 'Can only move into the DROP_PENDING phase from the COLLECTING phase') : invariant(false) : void 0;
 
     var newState = _extends({
       phase: 'DROP_PENDING'
-    }, state, (_extends3 = {}, _extends3["phase"] = 'DROP_PENDING', _extends3.isWaiting = true, _extends3.reason = reason, _extends3));
+    }, state, {
+      phase: 'DROP_PENDING',
+      isWaiting: true,
+      reason: reason
+    });
 
     return newState;
   }
@@ -2907,6 +2839,12 @@ var reducer = (function (state, action) {
   return state;
 });
 
+var beforeInitialCapture = function beforeInitialCapture(args) {
+  return {
+    type: 'BEFORE_INITIAL_CAPTURE',
+    payload: args
+  };
+};
 var lift = function lift(args) {
   return {
     type: 'LIFT',
@@ -3047,7 +2985,7 @@ function checkIndexes(insideDestination) {
     }
   }
 
-  if (!_Object$keys(errors).length) {
+  if (!Object.keys(errors).length) {
     return;
   }
 
@@ -3090,6 +3028,10 @@ var lift$1 = (function (marshal) {
 
         !(getState().phase === 'IDLE') ? process.env.NODE_ENV !== "production" ? invariant(false, 'Unexpected phase to start a drag') : invariant(false) : void 0;
         dispatch(flush());
+        dispatch(beforeInitialCapture({
+          draggableId: id,
+          movementMode: movementMode
+        }));
         var scrollOptions = {
           shouldPublishImmediately: movementMode === 'SNAP'
         };
@@ -3564,9 +3506,9 @@ var isCriticalEqual = function isCriticalEqual(first, second) {
 };
 
 var withTimings = function withTimings(key, fn) {
-  start(key);
+  start();
   fn();
-  finish(key);
+  finish();
 };
 
 var getDragStart = function getDragStart(critical, mode) {
@@ -3601,6 +3543,21 @@ var execute = function execute(responder, data, announce, getDefaultMessage) {
 var getPublisher = (function (getResponders, announce) {
   var asyncMarshal = getAsyncMarshal();
   var dragging = null;
+
+  var beforeCapture = function beforeCapture(draggableId, mode) {
+    !!dragging ? process.env.NODE_ENV !== "production" ? invariant(false, 'Cannot fire onBeforeCapture as a drag start has already been published') : invariant(false) : void 0;
+    withTimings('onBeforeCapture', function () {
+      var fn = getResponders().onBeforeCapture;
+
+      if (fn) {
+        var before = {
+          draggableId: draggableId,
+          mode: mode
+        };
+        fn(before);
+      }
+    });
+  };
 
   var beforeStart = function beforeStart(critical, mode) {
     !!dragging ? process.env.NODE_ENV !== "production" ? invariant(false, 'Cannot fire onBeforeDragStart as a drag start has already been published') : invariant(false) : void 0;
@@ -3695,6 +3652,7 @@ var getPublisher = (function (getResponders, announce) {
   };
 
   return {
+    beforeCapture: beforeCapture,
     beforeStart: beforeStart,
     start: start,
     update: update,
@@ -3709,6 +3667,11 @@ var responders = (function (getResponders, announce) {
   return function (store) {
     return function (next) {
       return function (action) {
+        if (action.type === 'BEFORE_INITIAL_CAPTURE') {
+          publisher.beforeCapture(action.payload.draggableId, action.payload.movementMode);
+          return;
+        }
+
         if (action.type === 'INITIAL_PUBLISH') {
           var critical = action.payload.critical;
           publisher.beforeStart(critical, action.payload.movementMode);
@@ -3937,8 +3900,6 @@ var clean$1 = function clean() {
     modified: {}
   };
 };
-
-var timingKey = 'Publish collection from DOM';
 function createPublisher(_ref) {
   var registry = _ref.registry,
       callbacks = _ref.callbacks;
@@ -3953,19 +3914,17 @@ function createPublisher(_ref) {
     callbacks.collectionStarting();
     frameId = requestAnimationFrame(function () {
       frameId = null;
-      start(timingKey);
+      start();
       var _staging = staging,
           additions = _staging.additions,
           removals = _staging.removals,
           modified = _staging.modified;
-
-      var added = _Object$keys(additions).map(function (id) {
+      var added = Object.keys(additions).map(function (id) {
         return registry.draggable.getById(id).getDimension(origin);
       }).sort(function (a, b) {
         return a.descriptor.index - b.descriptor.index;
       });
-
-      var updated = _Object$keys(modified).map(function (id) {
+      var updated = Object.keys(modified).map(function (id) {
         var entry = registry.droppable.getById(id);
         var scroll = entry.callbacks.getScrollWhileDragging();
         return {
@@ -3973,14 +3932,13 @@ function createPublisher(_ref) {
           scroll: scroll
         };
       });
-
       var result = {
         additions: added,
-        removals: _Object$keys(removals),
+        removals: Object.keys(removals),
         modified: updated
       };
       staging = clean$1();
-      finish(timingKey);
+      finish();
       callbacks.publish(result);
     });
   };
@@ -4097,8 +4055,7 @@ var getInitialPublish = (function (_ref) {
   var critical = _ref.critical,
       scrollOptions = _ref.scrollOptions,
       registry = _ref.registry;
-  var timingKey = 'Initial collection from DOM';
-  start(timingKey);
+  start();
   var viewport = getViewport();
   var windowScroll = viewport.scroll.current;
   var home = critical.droppable;
@@ -4112,7 +4069,7 @@ var getInitialPublish = (function (_ref) {
     draggables: toDraggableMap(draggables),
     droppables: toDroppableMap(droppables)
   };
-  finish(timingKey);
+  finish();
   var result = {
     dimensions: dimensions,
     critical: critical,
@@ -4387,9 +4344,7 @@ var stopAt = config.durationDampening.stopDampeningAt;
 var dampenValueByTime = (function (proposedScroll, dragStartTime) {
   var startOfRange = dragStartTime;
   var endOfRange = stopAt;
-
-  var now = _Date$now();
-
+  var now = Date.now();
   var runTime = now - startOfRange;
 
   if (runTime >= stopAt) {
@@ -4752,11 +4707,9 @@ var createFluidScroller = (function (_ref) {
   };
 
   var start$1 = function start$1(state) {
-    start('starting fluid scroller');
+    start();
     !!dragging ? process.env.NODE_ENV !== "production" ? invariant(false, 'Cannot start auto scrolling when already started') : invariant(false) : void 0;
-
-    var dragStartTime = _Date$now();
-
+    var dragStartTime = Date.now();
     var wasScrollNeeded = false;
 
     var fakeScrollCallback = function fakeScrollCallback() {
@@ -4774,7 +4727,7 @@ var createFluidScroller = (function (_ref) {
       dragStartTime: dragStartTime,
       shouldUseTimeDampening: wasScrollNeeded
     };
-    finish('starting fluid scroller');
+    finish();
 
     if (wasScrollNeeded) {
       tryScroll(state);
@@ -5015,7 +4968,7 @@ var getStyles$1 = (function (contextId) {
   };
 });
 
-var useIsomorphicLayoutEffect = typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+var useIsomorphicLayoutEffect = typeof window !== 'undefined' && typeof window.document !== 'undefined' && typeof window.document.createElement !== 'undefined' ? React.useLayoutEffect : React.useEffect;
 
 var getHead = function getHead() {
   var head = document.querySelector('head');
@@ -5408,15 +5361,18 @@ function useAnnouncer(contextId) {
     ref.current = el;
     el.id = id;
     el.setAttribute('aria-live', 'assertive');
-    el.setAttribute('role', 'log');
     el.setAttribute('aria-atomic', 'true');
 
-    _Object$assign(el.style, visuallyHidden);
+    _extends(el.style, visuallyHidden);
 
     getBodyElement().appendChild(el);
     return function cleanup() {
       setTimeout(function remove() {
-        getBodyElement().removeChild(el);
+        var body = getBodyElement();
+
+        if (body.contains(el)) {
+          body.removeChild(el);
+        }
 
         if (el === ref.current) {
           ref.current = null;
@@ -5437,27 +5393,54 @@ function useAnnouncer(contextId) {
   return announce;
 }
 
-var getId$1 = function getId(contextId) {
-  return "rbd-lift-instruction-" + contextId;
+var count = 0;
+var defaults = {
+  separator: '::'
 };
-function useLiftInstruction(contextId, liftInstruction) {
+function reset() {
+  count = 0;
+}
+function useUniqueId(prefix, options) {
+  if (options === void 0) {
+    options = defaults;
+  }
+
+  return useMemoOne.useMemo(function () {
+    return "" + prefix + options.separator + count++;
+  }, [options.separator, prefix]);
+}
+
+function getElementId(_ref) {
+  var contextId = _ref.contextId,
+      uniqueId = _ref.uniqueId;
+  return "rbd-hidden-text-" + contextId + "-" + uniqueId;
+}
+function useHiddenTextElement(_ref2) {
+  var contextId = _ref2.contextId,
+      text = _ref2.text;
+  var uniqueId = useUniqueId('hidden-text', {
+    separator: '-'
+  });
   var id = useMemoOne.useMemo(function () {
-    return getId$1(contextId);
-  }, [contextId]);
+    return getElementId({
+      contextId: contextId,
+      uniqueId: uniqueId
+    });
+  }, [uniqueId, contextId]);
   React.useEffect(function mount() {
     var el = document.createElement('div');
     el.id = id;
-    el.textContent = liftInstruction;
-
-    _Object$assign(el.style, {
-      display: 'none'
-    });
-
+    el.textContent = text;
+    el.style.display = 'none';
     getBodyElement().appendChild(el);
     return function unmount() {
-      getBodyElement().removeChild(el);
+      var body = getBodyElement();
+
+      if (body.contains(el)) {
+        body.removeChild(el);
+      }
     };
-  }, [id, liftInstruction]);
+  }, [id, text]);
   return id;
 }
 
@@ -6609,7 +6592,7 @@ function tryStart(_ref3) {
     }
   }
 
-  var tryDispatchWhenDragging = tryDispatch.bind(this, 'DRAGGING');
+  var tryDispatchWhenDragging = tryDispatch.bind(null, 'DRAGGING');
 
   function lift$1(args) {
     function completed() {
@@ -6808,7 +6791,17 @@ function useSensorMarshal(_ref4) {
     var entry = registry.draggable.findById(id);
     return entry ? entry.options : null;
   }, [registry.draggable]);
-  var tryReleaseLock = useMemoOne.useCallback(lockAPI.tryAbandon, [lockAPI]);
+  var tryReleaseLock = useMemoOne.useCallback(function tryReleaseLock() {
+    if (!lockAPI.isClaimed()) {
+      return;
+    }
+
+    lockAPI.tryAbandon();
+
+    if (store.getState().phase !== 'IDLE') {
+      store.dispatch(flush());
+    }
+  }, [lockAPI, store]);
   var isLockClaimed = useMemoOne.useCallback(lockAPI.isClaimed, [lockAPI]);
   var api = useMemoOne.useMemo(function () {
     return {
@@ -6829,6 +6822,7 @@ function useSensorMarshal(_ref4) {
 
 var createResponders = function createResponders(props) {
   return {
+    onBeforeCapture: props.onBeforeCapture,
     onBeforeDragStart: props.onBeforeDragStart,
     onDragStart: props.onDragStart,
     onDragEnd: props.onDragEnd,
@@ -6846,7 +6840,7 @@ function App(props) {
       setCallbacks = props.setCallbacks,
       sensors = props.sensors,
       nonce = props.nonce,
-      liftInstruction = props.liftInstruction;
+      dragHandleUsageInstructions = props.dragHandleUsageInstructions;
   var lazyStoreRef = React.useRef(null);
   useStartupValidation();
   var lastPropsRef = usePrevious(props);
@@ -6854,7 +6848,10 @@ function App(props) {
     return createResponders(lastPropsRef.current);
   }, [lastPropsRef]);
   var announce = useAnnouncer(contextId);
-  var liftInstructionId = useLiftInstruction(contextId, liftInstruction);
+  var dragHandleUsageInstructionsId = useHiddenTextElement({
+    contextId: contextId,
+    text: dragHandleUsageInstructions
+  });
   var styleMarshal = useStyleMarshal(contextId, nonce);
   var lazyDispatch = useMemoOne.useCallback(function (action) {
     getStore(lazyStoreRef).dispatch(action);
@@ -6931,10 +6928,10 @@ function App(props) {
       contextId: contextId,
       canLift: getCanLift,
       isMovementAllowed: getIsMovementAllowed,
-      liftInstructionId: liftInstructionId,
+      dragHandleUsageInstructionsId: dragHandleUsageInstructionsId,
       registry: registry
     };
-  }, [contextId, dimensionMarshal, focusMarshal, getCanLift, getIsMovementAllowed, liftInstructionId, registry]);
+  }, [contextId, dimensionMarshal, dragHandleUsageInstructionsId, focusMarshal, getCanLift, getIsMovementAllowed, registry]);
   useSensorMarshal({
     contextId: contextId,
     store: store,
@@ -6953,23 +6950,32 @@ function App(props) {
   }, props.children));
 }
 
-var instanceCount = 0;
+var count$1 = 0;
+function reset$1() {
+  count$1 = 0;
+}
+function useInstanceCount() {
+  return useMemoOne.useMemo(function () {
+    return "" + count$1++;
+  }, []);
+}
+
 function resetServerContext() {
-  instanceCount = 0;
+  reset$1();
+  reset();
 }
 function DragDropContext(props) {
-  var contextId = useMemoOne.useMemo(function () {
-    return "" + instanceCount++;
-  }, []);
-  var liftInstruction = props.liftInstruction || preset.liftInstruction;
+  var contextId = useInstanceCount();
+  var dragHandleUsageInstructions = props.dragHandleUsageInstructions || preset.dragHandleUsageInstructions;
   return React__default.createElement(ErrorBoundary, null, function (setCallbacks) {
     return React__default.createElement(App, {
       nonce: props.nonce,
       contextId: contextId,
       setCallbacks: setCallbacks,
-      liftInstruction: liftInstruction,
+      dragHandleUsageInstructions: dragHandleUsageInstructions,
       enableDefaultSensors: props.enableDefaultSensors,
       sensors: props.sensors,
+      onBeforeCapture: props.onBeforeCapture,
       onBeforeDragStart: props.onBeforeDragStart,
       onDragStart: props.onDragStart,
       onDragUpdate: props.onDragUpdate,
@@ -7247,12 +7253,6 @@ function useRequiredContext(Context) {
   var result = React.useContext(Context);
   !result ? process.env.NODE_ENV !== "production" ? invariant(false, 'Could not find required context') : invariant(false) : void 0;
   return result;
-}
-
-var count = 0;
-function useUniqueId(prefix) {
-  var countRef = React.useRef(count++);
-  return prefix + "::" + countRef.current;
 }
 
 var getClosestScrollableFromDrag = function getClosestScrollableFromDrag(dragging) {
@@ -7840,7 +7840,7 @@ function useValidation$1(props, contextId, getRef) {
     var id = props.draggableId;
     !id ? process.env.NODE_ENV !== "production" ? invariant(false, 'Draggable requires a draggableId') : invariant(false) : void 0;
     !(typeof id === 'string') ? process.env.NODE_ENV !== "production" ? invariant(false, "Draggable requires a [string] draggableId.\n      Provided: [type: " + typeof id + "] (value: " + id + ")") : invariant(false) : void 0;
-    !_Number$isInteger(props.index) ? process.env.NODE_ENV !== "production" ? invariant(false, prefix(id) + " requires an integer index prop") : invariant(false) : void 0;
+    !isInteger(props.index) ? process.env.NODE_ENV !== "production" ? invariant(false, prefix(id) + " requires an integer index prop") : invariant(false) : void 0;
 
     if (props.mapped.type === 'DRAGGING') {
       return;
@@ -7877,7 +7877,7 @@ function Draggable(props) {
 
   var _useRequiredContext = useRequiredContext(AppContext),
       contextId = _useRequiredContext.contextId,
-      liftInstructionId = _useRequiredContext.liftInstructionId,
+      dragHandleUsageInstructionsId = _useRequiredContext.dragHandleUsageInstructionsId,
       registry = _useRequiredContext.registry;
 
   var _useRequiredContext2 = useRequiredContext(DroppableContext),
@@ -7920,13 +7920,14 @@ function Draggable(props) {
   var dragHandleProps = useMemoOne.useMemo(function () {
     return isEnabled ? {
       tabIndex: 0,
+      role: 'button',
+      'aria-describedby': dragHandleUsageInstructionsId,
       'data-rbd-drag-handle-draggable-id': draggableId,
       'data-rbd-drag-handle-context-id': contextId,
-      'aria-labelledby': liftInstructionId,
       draggable: false,
       onDragStart: preventHtml5Dnd
     } : null;
-  }, [contextId, draggableId, isEnabled, liftInstructionId]);
+  }, [contextId, dragHandleUsageInstructionsId, draggableId, isEnabled]);
   var onMoveEnd = useMemoOne.useCallback(function (event) {
     if (mapped.type !== 'DRAGGING') {
       return;

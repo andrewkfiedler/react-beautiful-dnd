@@ -13,6 +13,7 @@ import {
   type DropResult,
 } from '../../../../src';
 import reorder from '../../../util/reorder';
+import { noop } from '../../../../src/empty';
 
 export type Item = {|
   id: string,
@@ -53,6 +54,8 @@ export const defaultItemRender: RenderItem = (item: Item) => (
 );
 
 type Props = {|
+  onBeforeCapture?: Function,
+  onBeforeDragStart?: Function,
   onDragStart?: Function,
   onDragUpdate?: Function,
   onDragEnd?: Function,
@@ -70,8 +73,6 @@ type Props = {|
   enableDefaultSensors?: boolean,
 |};
 
-function noop() {}
-
 function getItems() {
   return Array.from({ length: 3 }, (v, k): Item => ({
     id: `${k}`,
@@ -87,6 +88,8 @@ function withDefaultBool(value: ?boolean, defaultValue: boolean) {
 
 export default function App(props: Props) {
   const [items, setItems] = useState(() => props.items || getItems());
+  const onBeforeCapture = props.onBeforeCapture || noop;
+  const onBeforeDragStart = props.onBeforeDragStart || noop;
   const onDragStart = props.onDragStart || noop;
   const onDragUpdate = props.onDragUpdate || noop;
   const onDragEndProp = props.onDragEnd;
@@ -131,6 +134,8 @@ export default function App(props: Props) {
 
   return (
     <DragDropContext
+      onBeforeCapture={onBeforeCapture}
+      onBeforeDragStart={onBeforeDragStart}
       onDragStart={onDragStart}
       onDragUpdate={onDragUpdate}
       onDragEnd={onDragEnd}
