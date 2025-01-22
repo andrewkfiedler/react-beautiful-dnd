@@ -40,7 +40,7 @@ function List(props) {
     >
       {provided => (
         <div ref={provided.innerRef} {...provided.droppableProps}>
-          {items.map(item) => (
+          {items.map((item) => (
             <Draggable draggableId={item.id} index={item.index}>
               {(provided, snapshot) => (
                 <div
@@ -52,7 +52,7 @@ function List(props) {
                 </div>
               )}
             </Draggable>
-          )}
+          ))}
         </div>
       )}
     </Droppable>
@@ -82,19 +82,21 @@ function List(props) {
       droppableId="droppable"
       renderClone={renderItem}
     >
-      <div ref={provided.innerRef} {...provided.droppableProps}>
-        {items.map(item) => (
-          <Draggable draggableId={item.id} index={item.index}>
-            {renderItem}
-          </Draggable>
-        )}
-      </div>
+      {(provided, snapshot) => (
+        <div ref={provided.innerRef} {...provided.droppableProps}>
+          {items.map((item) => (
+            <Draggable draggableId={item.id} index={item.index}>
+              {renderItem}
+            </Draggable>
+          ))}
+        </div>
+      )}
     </Droppable>
   );
 }
 ```
 
-### `<Droppable /> | \renderClone`
+### `<Droppable /> | renderClone`
 
 This function is called to get a clone to be rendered while dragging.
 
@@ -124,12 +126,12 @@ getContainerForClone: () => HTMLElement,
 
 ⚠️ You are welcome to use your own `portal` solution if you want to from within your `<Draggable />`. Before we had a cloning API, reparenting needed to be done by using your own portal. It is now recommended that you use the cloning API.
 
-We have created a [working example](https://react-beautiful-dnd.netlify.com/?selectedKind=Portals&selectedStory=Using%20your%20own%20portal&full=0&addons=1&stories=1&panelRight=0&addonPanel=storybook%2Factions%2Factions-panel) that uses `ReactDOM.createPortal` directly to guide you. You can view the [source here](https://github.com/atlassian/react-beautiful-dnd/blob/master/stories/11-portal.stories.js).
+We have created a [working example](https://react-beautiful-dnd.netlify.app/?selectedKind=Portals&selectedStory=Using%20your%20own%20portal&full=0&addons=1&stories=1&panelRight=0&addonPanel=storybook%2Factions%2Factions-panel) that uses `ReactDOM.createPortal` directly to guide you. You can view the [source here](https://github.com/atlassian/react-beautiful-dnd/blob/master/stories/11-portal.stories.js).
 
 If you are doing drag and drop reordering within a `<table>` we have created a portal section inside our [table guide](/docs/patterns/tables.md)
 
 ## Performance ⚠️
 
-Keep in mind that anything that is reparented will be rendered from scratch. So you do not want to be moving large component trees into a `portal`: otherwise you will experience large UI jank. We do not using reparenting out of the box because of this performance drawback.
+Keep in mind that anything that is reparented will be rendered from scratch. So you do not want to be moving large component trees into a `portal`: otherwise you will experience large UI jank. We do not recommend using reparenting out of the box because of this performance drawback.
 
 [← Back to documentation](/README.md#documentation-)

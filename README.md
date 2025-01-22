@@ -1,3 +1,20 @@
+## ⚠️ Deprecated
+
+Hey all,
+
+We are taking the next step in saying thank you and goodbye to our friend `react-beautiful-dnd`.
+
+- 🔔 We will be soon deprecating `react-beautiful-dnd` on [npm](https://www.npmjs.com/package/react-beautiful-dnd). When we do you will start to get console warnings in your build tools.
+- 🔒 On Apr 30, 2025 (six months from posting) we will [archiving](https://docs.github.com/en/repositories/archiving-a-github-repository/archiving-repositories) the `react-beautiful-dnd` Github repository (it will become read only).
+
+Thank you everybody for your support of this project.
+
+[More information](https://github.com/atlassian/react-beautiful-dnd/issues/2672)
+
+<br>
+
+---
+
 <p align="center">
   <img src="https://user-images.githubusercontent.com/2182637/53611918-54c1ff80-3c24-11e9-9917-66ac3cef513d.png" alt="react beautiful dnd logo" />
 </p>
@@ -12,7 +29,7 @@
 
 ![quote application example](https://user-images.githubusercontent.com/2182637/53614150-efbed780-3c2c-11e9-9204-a5d2e746faca.gif)
 
-[Play with this example if you want!](https://react-beautiful-dnd.netlify.com/iframe.html?selectedKind=board&selectedStory=simple)
+[Play with this example if you want!](https://react-beautiful-dnd.netlify.app/iframe.html?selectedKind=board&selectedStory=simple)
 
 </div>
 
@@ -52,7 +69,7 @@ We have created [a free course on `egghead.io` 🥚](https://egghead.io/courses/
 - Able to move the dragging item to another element while dragging (clone, portal) - [Reparenting your `<Draggable />`](/docs/guides/reparenting.md)
 - [Create scripted drag and drop experiences 🎮](/docs/sensors/sensor-api.md)
 - Allows extensions to support for [any input type you like 🕹](/docs/sensors/sensor-api.md)
-- 🌲 Tree support through the [`@atlaskit/tree`](https://atlaskit.atlassian.com/packages/core/tree) package
+- 🌲 Tree support through the [`@atlaskit/tree`](https://atlaskit.atlassian.com/packages/confluence/tree) package
 - A `<Droppable />` list can be a scroll container (without a scrollable parent) or be the child of a scroll container (that also does not have a scrollable parent)
 - Independent nested lists - a list can be a child of another list, but you cannot drag items from the parent list into a child list
 - Server side rendering (SSR) compatible - see [resetServerContext()](/docs/api/reset-server-context.md)
@@ -142,14 +159,20 @@ There are a lot of libraries out there that allow for drag and drop interactions
 - [![kr](https://raw.githubusercontent.com/gosquared/flags/master/flags/flags/shiny/24/South-Korea.png) **한글/Korean**](https://github.com/LeeHyungGeun/react-beautiful-dnd-kr)
 - [![ru](https://raw.githubusercontent.com/gosquared/flags/master/flags/flags/shiny/24/Russia.png) **На русском/Russian**](https://github.com/vtereshyn/react-beautiful-dnd-ru)
 - [![pt](https://raw.githubusercontent.com/gosquared/flags/master/flags/flags/shiny/24/Brazil.png) **Português/Portuguese**](https://github.com/dudestein/react-beautiful-dnd-pt)
+- [![gr](https://raw.githubusercontent.com/gosquared/flags/master/flags/flags/shiny/24/Greece.png) **Ελληνικά/Greek**](https://github.com/milvard/react-beautiful-dnd-gr)
+- [![ja](https://raw.githubusercontent.com/gosquared/flags/master/flags/flags/shiny/24/Japan.png) **日本語/Japanese**](https://github.com/eltociear/react-beautiful-dnd-ja)
 
-## Author ✍️
+## Creator ✍️
 
 Alex Reardon [@alexandereardon](https://twitter.com/alexandereardon)
+
+> Alex is no longer personally maintaning this project. The other wonderful maintainers are carrying this project forward.
+
+## Maintainers
+
+- [Daniel Del Core](https://twitter.com/danieldelcore)
+- Many other [@Atlassian](https://twitter.com/Atlassian)'s!
 
 ## Collaborators 🤝
 
 - Bogdan Chadkin [@IAmTrySound](https://twitter.com/IAmTrySound)
-- Luke Batchelor [@alukebatchelor](https://twitter.com/alukebatchelor)
-- Jared Crowe [@jaredjcrowe](https://twitter.com/jaredjcrowe)
-- Many other [@Atlassian](https://twitter.com/Atlassian)'s!
